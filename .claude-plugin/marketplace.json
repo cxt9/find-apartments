@@ -1,0 +1,24 @@
+{
+  "name": "find-apartments",
+  "owner": {
+    "name": "find-apartments contributors"
+  },
+  "plugins": [
+    {
+      "name": "find-apartments",
+      "source": "./",
+      "description": "Search Israeli real estate platforms for rental apartments with Telegram notifications",
+      "version": "1.0.0",
+      "author": {
+        "name": "find-apartments contributors"
+      },
+      "license": "MIT",
+      "keywords": [
+        "real-estate",
+        "israel",
+        "apartments",
+        "rental"
+      ]
+    }
+  ]
+}
