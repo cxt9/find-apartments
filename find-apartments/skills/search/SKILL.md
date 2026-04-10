@@ -1,11 +1,11 @@
 ---
 name: search
-description: Use when orchestrating a full apartment search run — reads config, fans out parallel scraper agents per platform, collects results, deduplicates against cache, syncs new listings to Google Sheets, and sends Telegram notifications
+description: Use when orchestrating a full apartment search run — reads config, fans out parallel scraper agents per platform, collects results, deduplicates against cache, and sends Telegram notifications for new listings
 ---
 
 # Search Orchestrator
 
-Coordinates the full apartment search pipeline: scrape all platforms, dedup, sync to sheet, notify via Telegram.
+Coordinates the full apartment search pipeline: scrape all platforms, dedup, notify via Telegram.
 
 ## Input
 
@@ -22,19 +22,18 @@ If CLI args are provided, use them as a single search profile. Otherwise, use al
 Read `~/.claude/plugins/find-apartments/data/config.yaml`.
 
 If the file doesn't exist, stop and tell the user:
-> "No config found. Create `~/.claude/plugins/find-apartments/data/config.yaml` with your search profiles, Telegram credentials, and Google Sheets credentials path. See the plugin README for the format."
+> "No config found. Create `~/.claude/plugins/find-apartments/data/config.yaml` with your search profiles and Telegram credentials. See the plugin README for the format."
 
 Extract:
 - `searches` — array of search profiles
 - `telegram.bot_token` and `telegram.chat_id`
-- `google_sheets.credentials_path`
 - `facebook_groups` — optional
 
 ### Phase 2: Load Cache
 
 Invoke the **cache** skill to read the current cache from `~/.claude/plugins/find-apartments/data/cache.json`. Collect all known URLs.
 
-Also check for un-synced listings (`synced_to_sheet: false` or `notified: false`) — these will be retried alongside new findings.
+Also check for un-notified listings (`notified: false`) — these will be retried alongside new findings.
 
 ### Phase 3: Fan Out Scrapers
 
@@ -55,27 +54,21 @@ Wait for all agents to complete and collect their listing arrays.
 ### Phase 4: Dedup Against Cache
 
 Combine all listings from all scrapers into one array. For each listing:
-- If `listing.url` exists in the cache AND `synced_to_sheet` is `true` AND `notified` is `true` → skip (fully processed)
-- If `listing.url` exists in the cache but flags are `false` → include for retry
+- If `listing.url` exists in the cache AND `notified` is `true` → skip (fully processed)
+- If `listing.url` exists in the cache but `notified` is `false` → include for retry
 - If `listing.url` is NOT in the cache → new listing, include
 
 ### Phase 5: Update Cache
 
-Invoke the **cache** skill to add all new listings to cache with `synced_to_sheet: false` and `notified: false`.
+Invoke the **cache** skill to add all new listings to cache with `notified: false`.
 
-### Phase 6: Sync to Google Sheet
+### Phase 6: Send Telegram Notifications
 
-Invoke the **sync-sheet** skill with the array of new + un-synced listings and the `credentials_path` from config.
-
-If successful, invoke the **cache** skill to update `synced_to_sheet: true` for the synced URLs.
-
-### Phase 7: Send Telegram Notifications
-
-Invoke the **notify** skill with the successfully synced listings, `bot_token`, and `chat_id` from config.
+Invoke the **notify** skill with the new + un-notified listings, `bot_token`, and `chat_id` from config.
 
 If successful, invoke the **cache** skill to update `notified: true` for the notified URLs.
 
-### Phase 8: Summary
+### Phase 7: Summary
 
 Report to the user:
 
@@ -86,9 +79,7 @@ Report to the user:
 - **Platforms scraped:** Yad2, WinWin, Madlan, Facebook (list which succeeded)
 - **Total listings found:** X
 - **New listings:** Y (not seen before)
-- **Synced to Google Sheet:** Z rows appended
 - **Telegram notifications sent:** W messages
-- **Sheet URL:** https://docs.google.com/spreadsheets/d/...
 
 ### Skipped Platforms
 - [List any platforms that were unavailable with reason]
@@ -101,6 +92,5 @@ Report to the user:
 ## Error Recovery
 
 - If one scraper fails, continue with the others. Report the failure in the summary.
-- If Google Sheets sync fails, still attempt Telegram notifications for any cached-but-un-notified listings.
 - If Telegram fails, listings remain in cache with `notified: false` for next run.
 - Never let a single platform failure abort the entire pipeline.

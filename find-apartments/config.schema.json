@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["searches", "telegram", "google_sheets"],
+  "required": ["searches", "telegram"],
   "properties": {
     "searches": {
       "type": "array",
@@ -22,13 +22,6 @@
       "properties": {
         "bot_token": { "type": "string" },
         "chat_id": { "type": "string" }
-      }
-    },
-    "google_sheets": {
-      "type": "object",
-      "required": ["credentials_path"],
-      "properties": {
-        "credentials_path": { "type": "string" }
       }
     },
     "facebook_groups": {

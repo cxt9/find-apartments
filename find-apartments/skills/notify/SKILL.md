@@ -1,11 +1,11 @@
 ---
 name: notify
-description: Use when sending new rental listings to Telegram after they have been synced to Google Sheets — sends each listing as a separate formatted message via the Telegram Bot API
+description: Use when sending new rental listings to Telegram — sends each listing as a separate formatted message via the Telegram Bot API
 ---
 
 # Telegram Notification Sender
 
-Sends new rental listings to Telegram via the Bot API. Only called for listings that are new (not in cache) and have been successfully synced to Google Sheets.
+Sends new rental listings to Telegram via the Bot API. Only called for listings that are new (not yet in cache).
 
 ## Prerequisites
 

@@ -1,6 +1,6 @@
 ---
 name: cache
-description: Use when checking if a listing URL is already cached, adding new listings to the cache, or updating sync/notify flags after Google Sheets or Telegram operations
+description: Use when checking if a listing URL is already cached, adding new listings to the cache, or updating the notified flag after Telegram operations
 ---
 
 # Listing Cache Manager
@@ -18,7 +18,6 @@ Manages the local JSON cache at `~/.claude/plugins/find-apartments/data/cache.js
     "rooms": 5,
     "address": "יונה וולך 4",
     "source": "Yad2",
-    "synced_to_sheet": true,
     "notified": true
   }
 }
@@ -36,22 +35,21 @@ After scraping, for each new listing (URL not in cache), add an entry:
 
 ```bash
 # Read existing cache (or start with empty object)
-# Add new entries with synced_to_sheet: false, notified: false
+# Add new entries with notified: false
 # Write back with the Write tool
 ```
 
-Use the Read tool to read the current cache, then use the Write tool to write the updated cache. Always set `first_seen` to today's date (ISO format), `synced_to_sheet` to `false`, and `notified` to `false` for new entries.
+Use the Read tool to read the current cache, then use the Write tool to write the updated cache. Always set `first_seen` to today's date (ISO format) and `notified` to `false` for new entries.
 
-### Update flags after sync/notify
+### Update flags after notify
 
-After successful Google Sheets append, update `synced_to_sheet` to `true` for the synced URLs.
 After successful Telegram send, update `notified` to `true` for the notified URLs.
 
 Read the cache, update the flags, write it back.
 
-### Find un-synced listings
+### Find un-notified listings
 
-Read the cache and filter for entries where `synced_to_sheet` is `false` — these need to be retried for sheet sync. Similarly filter `notified` is `false` for Telegram retries.
+Read the cache and filter for entries where `notified` is `false` — these need to be retried for Telegram notifications.
 
 ## Data Directory
 
