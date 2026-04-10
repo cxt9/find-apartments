@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { homedir } from 'os';
 
@@ -67,6 +67,7 @@ async function createSheet(credentialsPath, title) {
     }
   });
 
+  mkdirSync(DATA_DIR, { recursive: true });
   writeFileSync(SHEET_ID_FILE, spreadsheetId, 'utf-8');
   console.log(JSON.stringify({ spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}` }));
 }
