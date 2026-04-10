@@ -1,16 +1,16 @@
 {
   "name": "find-apartments",
   "owner": {
-    "name": "Doron Goldberg"
+    "name": "find-apartments contributors"
   },
   "plugins": [
     {
       "name": "find-apartments",
       "source": "./",
-      "description": "Search Israeli real estate platforms for rental apartments with Google Sheets sync and Telegram notifications",
+      "description": "Search Israeli real estate platforms for rental apartments with Telegram notifications",
       "version": "1.0.0",
       "author": {
-        "name": "Doron Goldberg"
+        "name": "find-apartments contributors"
       },
       "license": "MIT",
       "keywords": [
