@@ -1,128 +1,97 @@
 ---
 name: search-madlan
-description: Use when scraping Madlan rental listings for a specific city and room count — uses Chrome DevTools MCP tools because Madlan blocks automated web_fetch requests with 403 errors
+description: Use when scraping Madlan rental listings for a specific city and room count — calls Madlan's internal GraphQL API directly via a Node.js script (no browser, no CAPTCHA).
 ---
 
-# Madlan Rental Scraper (Chrome DevTools)
+# Madlan Rental Scraper (Direct API)
 
-Scrapes rental apartment listings from madlan.co.il using Chrome DevTools MCP tools. Madlan returns 403 on automated `WebFetch` requests, so we must use the browser.
+Scrapes rental apartment listings from madlan.co.il by calling their internal GraphQL API at `https://www.madlan.co.il/api2`. No browser required.
+
+## Background
+
+Madlan's HTML pages are protected by PerimeterX (HUMAN Security), which blocks `WebFetch`, Puppeteer, and most stealth approaches through TLS/JA3 fingerprinting and behavioral analysis. Their GraphQL API, however, is only gated by a Bearer token — not PerimeterX — and a visitor-role JWT captured from a real browser session works fine for read-only queries.
+
+The token is baked into `scripts/madlan-api.mjs` and currently valid until 2027. If Madlan rotates the scheme or the token expires, re-capture a fresh one from the browser's Network tab (look for any `POST /api2` request and copy the `authorization: Bearer ...` header).
 
 ## Prerequisites
 
-- Chrome DevTools MCP server must be running and connected.
-- If `mcp__chrome-devtools__list_pages` fails, report that Madlan scraping is unavailable and return an empty array. Do NOT fail the entire search run.
+- Node.js 18+ (for global `fetch`).
+- The plugin script at `scripts/madlan-api.mjs` must exist. Locate the plugin directory:
+
+```bash
+PLUGIN_DIR=$(find ~/.claude/plugins/cache -path "*/find-apartments/scripts/madlan-api.mjs" -exec dirname {} \; 2>/dev/null | head -1 | sed 's|/scripts||')
+```
+
+If not found, check `~/.claude/plugins/local/find-apartments/`.
 
 ## Input
 
-You will receive search parameters:
-- `city` — city name in Hebrew (e.g., "הוד השרון")
-- `min_rooms` — minimum number of rooms (e.g., 5)
-- `max_price` — optional maximum monthly rent in NIS
+- `city` — Hebrew city name (e.g., `"הוד השרון"`)
+- `min_rooms` — minimum room count (e.g., `5`)
+- `max_price` — optional (not yet filtered server-side; filter client-side after)
 
-## Scraping Process
+## Scraping
 
-### Step 1: Check Chrome DevTools availability
+Run the script with the city and room count:
 
-```
-mcp__chrome-devtools__list_pages
-```
-
-If this fails, return empty results with a note: "Chrome DevTools unavailable — Madlan skipped."
-
-### Step 2: Navigate to Madlan rental page
-
-Build the Madlan URL for the city. The URL pattern for Madlan rental pages uses Hebrew URL-encoded city names:
-
-```
-mcp__chrome-devtools__navigate_page
-URL: https://www.madlan.co.il/for-rent/{city_name_hebrew}-ישראל
+```bash
+node "$PLUGIN_DIR/scripts/madlan-api.mjs" "הוד השרון" 5 --deal rent
 ```
 
-For example, for הוד השרון: `https://www.madlan.co.il/for-rent/הוד-השרון-ישראל`
+Arguments:
+1. City (quoted, Hebrew)
+2. Minimum rooms (number — supports half rooms like `4.5`)
+3. `--deal rent` (default) or `--deal buy`
 
-### Step 3: Apply room filter
-
-Take a screenshot to see the current state, then use `evaluate_script` to interact with filters:
-
-```
-mcp__chrome-devtools__take_screenshot
-```
-
-Look for room filter controls. Use `evaluate_script` or `click` to set minimum rooms to the desired value.
-
-### Step 4: Scroll and extract listings
-
-Scroll down multiple times to load listings (Madlan uses infinite scroll):
-
-```javascript
-// Use evaluate_script to scroll and wait
-() => { window.scrollBy(0, 1500); return 'scrolled'; }
-```
-
-Repeat 3-4 times with short pauses between scrolls. Take a screenshot after scrolling to verify content loaded.
-
-### Step 5: Extract listing data from DOM
-
-Use `evaluate_script` to extract listing data:
-
-```javascript
-() => {
-  const listings = document.querySelectorAll('[data-testid="listing-card"], .listing-card, article');
-  return Array.from(listings).map(el => ({
-    text: el.innerText,
-    href: el.querySelector('a')?.href || ''
-  }));
-}
-```
-
-Adapt the selectors based on what the screenshot shows. Madlan's DOM structure may change — use `take_snapshot` to inspect the element tree if selectors don't work.
-
-### Step 6: Fetch individual listing details
-
-For each listing URL found, navigate to it and extract details:
-
-```
-mcp__chrome-devtools__navigate_page URL: <listing URL>
-mcp__chrome-devtools__take_screenshot
-```
-
-Use `evaluate_script` to extract: address, price, rooms, floor, size, amenities.
-
-### Step 7: Normalize output
-
-Return listings in the same normalized format as other scrapers:
-
-```json
-{
-  "url": "https://www.madlan.co.il/listing/XXXXX",
-  "source": "Madlan",
-  "city": "{city}",
-  "address": "...",
-  "neighborhood": "...",
-  "rooms": 5,
-  "floor": "3/9",
-  "size_sqm": 140,
-  "price": 10000,
-  "mamad": null,
-  "parking": null,
-  "elevator": null,
-  "ac": null,
-  "balcony": null,
-  "pets": null,
-  "available_from": "",
-  "contact": null,
-  "images": []
-}
-```
-
-## Rules
-
-- This scraper runs SEQUENTIALLY (not in parallel) because it shares the Chrome browser with the Facebook scraper.
-- Fetch up to 10 listings per search.
-- If Chrome DevTools is unavailable, return empty results gracefully — do not error.
-- Use `take_screenshot` after each navigation to verify the page loaded correctly.
-- Madlan's DOM changes frequently — if selectors fail, use `take_snapshot` to inspect and adapt.
+The script converts spaces in the city name to hyphens and builds Madlan's `docId` pattern: `"<city>-ישראל"`. This works for standard Hebrew city names.
 
 ## Output
 
-Return the array of normalized listings. Report count found, count fetched, and note if Chrome DevTools was unavailable.
+The script prints a single JSON object to stdout:
+
+```json
+{
+  "total": 45,
+  "count": 45,
+  "listings": [
+    {
+      "url": "https://www.madlan.co.il/listings/DXVl8yEOS8M",
+      "source": "Madlan",
+      "city": "הוד השרון",
+      "address": "הדרים 1",
+      "neighborhood": "מגדיאל",
+      "rooms": 5,
+      "floor": "10",
+      "size_sqm": 150,
+      "price": 8500,
+      "mamad": null,
+      "parking": null,
+      "elevator": null,
+      "ac": null,
+      "balcony": null,
+      "pets": null,
+      "available_from": "2026-04-01T12:21:49.000Z",
+      "contact": null,
+      "images": ["https://madlan.co.il/bulletins/..."]
+    }
+  ]
+}
+```
+
+Parse the JSON and return `listings` from the skill. If `max_price` was passed as input, filter the listings array in-memory before returning.
+
+## Error handling
+
+- If the script exits non-zero, capture stderr, report `"Madlan API failed: <reason>"`, and return an empty array. Do NOT fail the entire search run.
+- If the script returns an `errors` field or empty `poi`, return an empty array with a note.
+- Common failure modes:
+  - Expired or rotated JWT → fetch returns 401/403. Re-capture token from browser.
+  - Madlan schema change → GraphQL errors. Update the query in `scripts/madlan-api.mjs`.
+
+## Why this approach
+
+Previous attempts that failed:
+1. **`WebFetch`** — 403 from PerimeterX on every request.
+2. **Chrome DevTools MCP** — captured the browser but PerimeterX still served the "press and hold" captcha on navigation.
+3. **Puppeteer + stealth plugin** — bypassed `navigator.webdriver` and initial fingerprint, but PerimeterX caught behavioral/TLS signatures on the second request.
+4. **Direct API** (current) — works because PerimeterX guards the HTML pages, not the JSON API. Zero browser, ~200ms per query, full listing details including images.
